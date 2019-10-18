@@ -4,12 +4,12 @@ LFLAGS1 = -std=c99 -Wall -L/usr/local/lib
 LFLAGS2 = -lgsl -lgslcblas -lm -o
 
 .PHONY: clean
-.ALL: %
+.ALL: link
 
 %.o: %.c
 	$(CC) $(CFLAGS) $^
 
-%: %.o
+links: %.o
 	$(CC) $(LFLAGS1) $^ $(LFLAGS2) $@
 
 clean:
