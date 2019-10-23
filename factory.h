@@ -135,7 +135,7 @@ public:
       myfile.close();
     }
   }
-  void estimate(double temp,char* command){
+  double estimate(double temp,char* command){
     Parameter *target;
     char temperature_dummy [] = "TEMPERATURE";
     char pressure_dummy [] = "PRESSURE";
@@ -155,9 +155,10 @@ public:
          (target->cov00),(target->cov01),(target->cov11),
          &(target->est),&(target->est_err));
 
-       printf ("# Fit: %g %g\n", temp,(target->est) );
-       printf ("# High : %g %g\n", temp, (target->est) + (target->est_err));
-       printf ("# Low : %g %g\n", temp, (target->est) - (target->est_err));
+      return target->est;
+       // printf ("# Fit: %g %g\n", temp,(target->est) );
+       // printf ("# High : %g %g\n", temp, (target->est) + (target->est_err));
+       // printf ("# Low : %g %g\n", temp, (target->est) - (target->est_err));
   }
   void learn(char *command){
     Parameter *target;
