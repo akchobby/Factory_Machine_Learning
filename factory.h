@@ -3,9 +3,11 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <fstream>
 #include <string.h>
 #include <gsl/gsl_fit.h>
 #include <vector>
+#include <boost/algorithm/string.hpp>
 using namespace std;
 
 class Parameter{
@@ -32,6 +34,12 @@ class Parameter{
       this->precision = {};
       this->size = 0;
     }
+    void cleanVectors(){
+      this->data = {};
+      this->temps = {};
+      this->precision = {};
+      this->size = 0;
+    }
 
     void updateData(double temps[], double variable[], double prec[], double n){
       for (int i=0;i<n;i++){
@@ -39,8 +47,13 @@ class Parameter{
         this->temps.push_back(temps[i]);
         this->precision.push_back(prec[i]);
         this->size ++;
-        cout<<variable[i]<<"\t"<<temps[i]<<"\t"<<prec[i]<<"\t"<<size<<endl;
       }
+    }
+    void updateData(double temp,double variable,double prec){
+      this->data.push_back(variable);
+      this->temps.push_back(temp);
+      this->precision.push_back(prec);
+      this->size ++;
     }
     double* giveData(){
       double *result = (double *)malloc(this->size*sizeof(double));
@@ -69,94 +82,116 @@ class Parameter{
 };
 
 class Factory{
-
 public:
   int id;
+  string file_address;
   Parameter temperature , pressure, humidity;
   Factory(int number){
     this->id = number;
+    string id_s = to_string(id);
+    this->file_address = "Fact_"+id_s+".txt";
+    ofstream outfile (file_address);
+    outfile << "Logs for Factory: "+id_s << endl;
+    outfile.close();
   }
-
-  void estimate(double temp,Parameter target)
-  {
-    gsl_fit_linear_est(temp,
-       (target.c0),(target.c1),
-       (target.cov00),(target.cov01),(target.cov11),
-       &(target.est),&(target.est_err));
-
-     printf ("# Fit: %g %g\n", temp,(target.est) );
-     printf ("# High : %g %g\n", temp, (target.est) + (target.est_err));
-     printf ("# Low : %g %g\n", temp, (target.est) - (target.est_err));
+  void storeData(double TIME, double TEMPERATURE,double PRESSURE,double HUMIDITY){
+    ofstream outfile;
+    outfile.open(this->file_address, ios_base::app);
+    outfile << to_string(TIME)<<","<<to_string(TEMPERATURE)<<","<<to_string(PRESSURE)<<","<<to_string(HUMIDITY)<<endl;
+    outfile.close();
   }
+  void fetchData(){
+    string line;
+    ifstream myfile(this->file_address);
+    vector <string> results;
+    double time,t,p,h;
+    string time_s,t_s,p_s,h_s;
 
-  void learn(char *target){
+    if(myfile.is_open()){
+      getline(myfile,line);
+      while( getline(myfile,line)){
+        results = {};
+        time_s = "";
+        t_s = "";
+        p_s = "";
+        h_s = "";
+
+        boost::split(results, line, [](char c){return c == ',';});
+
+        time_s.append(results.at(0));
+        t_s.append(results.at(1));
+        p_s.append(results.at(2));
+        h_s.append(results.at(3));
+        cout<<time_s<<"\t"<<t_s<<"\t"<<p_s<<"\t"<<h_s<<endl;
+        time = atof(time_s.c_str());
+        t = atof(t_s.c_str());
+        p = atof(p_s.c_str());
+        h = atof(h_s.c_str());
+
+        this->temperature.updateData(time,t,0.1);
+        this->pressure.updateData(time,p,0.1);
+        this->humidity.updateData(time,h,0.1);
+      }
+      myfile.close();
+    }
+  }
+  void estimate(double temp,char* command){
+    Parameter *target;
     char temperature_dummy [] = "TEMPERATURE";
     char pressure_dummy [] = "PRESSURE";
     char humidity_dummy [] = "HUMIDITY";
+    if (!strcmp(command,temperature_dummy)) {
+      target = &(this->temperature);
+    }
+    if (!strcmp(command,pressure_dummy)) {
+      target = &(this->pressure);
+    }
+    if (!strcmp(command,humidity_dummy)) {
+      target = &(this->humidity);
+    }
 
-      if(!strcmp(target,temperature_dummy)){
-        double size = this->temperature.giveSize();
-        double* data = (double *)malloc(size*sizeof (double));
-        double* temps = (double *)malloc(size*sizeof (double));
-        double* precision = (double *)malloc(size*sizeof (double));
+      gsl_fit_linear_est(temp,
+         (target->c0),(target->c1),
+         (target->cov00),(target->cov01),(target->cov11),
+         &(target->est),&(target->est_err));
 
-        data = this->temperature.giveData();
-        temps = this->temperature.giveTemps();
-        precision = this->temperature.givePrecision();
+       printf ("# Fit: %g %g\n", temp,(target->est) );
+       printf ("# High : %g %g\n", temp, (target->est) + (target->est_err));
+       printf ("# Low : %g %g\n", temp, (target->est) - (target->est_err));
+  }
+  void learn(char *command){
+    Parameter *target;
+    char temperature_dummy [] = "TEMPERATURE";
+    char pressure_dummy [] = "PRESSURE";
+    char humidity_dummy [] = "HUMIDITY";
+    if (!strcmp(command,temperature_dummy)) {
+      target = &(this->temperature);
+    }
+    if (!strcmp(command,pressure_dummy)) {
+      target = &(this->pressure);
+    }
+    if (!strcmp(command,humidity_dummy)) {
+      target = &(this->humidity);
+    }
+     double size = target->giveSize();
+     double* data = (double *)malloc(size*sizeof (double));
+     double* temps = (double *)malloc(size*sizeof (double));
+     double* precision = (double *)malloc(size*sizeof (double));
 
-        gsl_fit_wlinear (temps, 1, precision, 1, data, 1, size,
-                         &(this->temperature.c0), &(this->temperature.c1),
-                         &(this->temperature.cov00), &(this->temperature.cov01), &(this->temperature.cov11),
-                         &(this->temperature.chisq));
+     data = target->giveData();
+     temps = target->giveTemps();
+     precision = target->givePrecision();
 
-         printf ("# best fit: Y = %g + %g X\n", (this->temperature.c0), (this->temperature.c1));
-         printf ("# covariance matrix:\n");
-         printf ("# [ %g, %g\n#   %g, %g]\n",
-                 (this->temperature.cov00), (this->temperature.cov01), (this->temperature.cov01), (this->temperature.cov11));
-         printf ("# chisq = %g\n", (this->temperature.chisq));
-       }
-       if(!strcmp(target,pressure_dummy)){
-         double size = this->pressure.giveSize();
-         double* data = (double *)malloc(size*sizeof (double));
-         double* temps = (double *)malloc(size*sizeof (double));
-         double* precision = (double *)malloc(size*sizeof (double));
+     gsl_fit_wlinear (temps, 1, precision, 1, data, 1, size,
+                      &(target->c0), &(target->c1),
+                      &(target->cov00), &(target->cov01), &(target->cov11),
+                      &(target->chisq));
 
-         data = this->pressure.giveData();
-         temps = this->pressure.giveTemps();
-         precision = this->pressure.givePrecision();
-
-         gsl_fit_wlinear (temps, 1, precision, 1, data, 1, size,
-                          &(this->pressure.c0), &(this->pressure.c1),
-                          &(this->pressure.cov00), &(this->pressure.cov01), &(this->pressure.cov11),
-                          &(this->pressure.chisq));
-
-          printf ("# best fit: Y = %g + %g X\n", (this->pressure.c0), (this->pressure.c1));
-          printf ("# covariance matrix:\n");
-          printf ("# [ %g, %g\n#   %g, %g]\n",
-                  (this->pressure.cov00), (this->pressure.cov01), (this->pressure.cov01), (this->pressure.cov11));
-          printf ("# chisq = %g\n", (this->pressure.chisq));
-        }
-        if(!strcmp(target,humidity_dummy)){
-          double size = this->pressure.giveSize();
-          double* data = (double *)malloc(size*sizeof (double));
-          double* temps = (double *)malloc(size*sizeof (double));
-          double* precision = (double *)malloc(size*sizeof (double));
-
-          data = this->humidity.giveData();
-          temps = this->humidity.giveTemps();
-          precision = this->humidity.givePrecision();
-
-          gsl_fit_wlinear (temps, 1, precision, 1, data, 1, size,
-                           &(this->humidity.c0), &(this->humidity.c1),
-                           &(this->humidity.cov00), &(this->humidity.cov01), &(this->humidity.cov11),
-                           &(this->humidity.chisq));
-
-           printf ("# best fit: Y = %g + %g X\n", (this->humidity.c0), (this->humidity.c1));
-           printf ("# covariance matrix:\n");
-           printf ("# [ %g, %g\n#   %g, %g]\n",
-                   (this->humidity.cov00), (this->humidity.cov01), (this->humidity.cov01), (this->humidity.cov11));
-           printf ("# chisq = %g\n", (this->humidity.chisq));
-         }
+      printf ("# best fit: Y = %g + %g X\n", (target->c0), (target->c1));
+      printf ("# covariance matrix:\n");
+      printf ("# [ %g, %g\n#   %g, %g]\n",
+              (target->cov00), (target->cov01), (target->cov01), (target->cov11));
+      printf ("# chisq = %g\n", (target->chisq));
 
   }
 };
