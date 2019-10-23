@@ -132,9 +132,9 @@ int main (void)
   // double w[4] = {  0.1,  0.2,  0.3,  0.4 };
 
   // Factory factory(1);
-
-  // factory.temperature.updateData(x,y,w,n);
-
+  //
+  // // factory.temperature.updateData(x,y,w,n);
+  //
   // factory.storeData(1970,12,200,0.1);
   // factory.storeData(1980,11,300,0.2);
   // factory.storeData(1990,14,400,0.3);
@@ -154,8 +154,8 @@ int main (void)
   // factories[0].fetchData();
 
 
-
-
+  //
+  //
   // char temp_dummy[]="TEMPERATURE";
   // char pressure_dummy[]="PRESSURE";
   // factory.learn(temp_dummy);
